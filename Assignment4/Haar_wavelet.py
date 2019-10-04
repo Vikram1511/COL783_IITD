@@ -24,6 +24,8 @@ def psnr(I1,I2):
 
 
 def run_length_encoding(image):
+    m,n = image.shape
+    image= image.flatten()
     bitstream = ""
     skipped_zeros = 0
     for i in range(image.shape[0]):
@@ -32,6 +34,7 @@ def run_length_encoding(image):
             skipped_zeros=0
         else:
             skipped_zeros=skipped_zeros+1
+    bitstream = str(m)+ " " + str(n) + " "+ bitstream + ";"
     return bitstream
 
 
@@ -91,7 +94,7 @@ def haar2D(image):
     return result_img,LL,coefficients
 
 
-def haar_transform(image,levels=None,threshold=None): 
+def haar_transform(image,levels=None,K=None): 
     img = image.copy()
     m,n = img.shape
     detail_coef = dict()
@@ -111,9 +114,9 @@ def haar_transform(image,levels=None,threshold=None):
                 m = m//2
                 n = n//2
                 level = level+1
-                if(threshold is not None):
-                    for key,value in _coef.items():
-                        _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
+                # if(threshold is not None):
+                #     for key,value in _coef.items():
+                #         _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
                 detail_coef["level_"+str(level)] = _coef
         else:
             while(m!=1):
@@ -123,15 +126,28 @@ def haar_transform(image,levels=None,threshold=None):
                 m = m//2
                 n = n//2
                 level = level+1
-                if(threshold is not None):
-                    for key,value in _coef.items():
-                        _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
+                # if(threshold is not None):
+                #     for key,value in _coef.items():
+                #         _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
                 detail_coef["level_"+str(level)] = _coef
-
-    haar_result = haar_result.astype(np.float32)
-    if(threshold is not None):
-        haar_result = np.where(np.abs(haar_result)<threshold,0,haar_result)
     return haar_result,LL,detail_coef
+
+def thresholdingWaveletCoef(a,detail_coef,haar_forward,K):
+    total_levels = len(detail_coef)
+    k = total_levels
+    x,y = a.shape
+    haar_forward = haar_forward.astype(np.float32)
+    wavelet_coef = np.array(list(haar_forward[x:,y:].flatten()) + list(haar_forward[x:,:y].flatten()))
+    wavelet_coef = np.unique(np.round(wavelet_coef,decimals=1))
+    threshold_val = np.percentile(np.abs(wavelet_coef),100-K)
+    print(threshold_val)
+    while(k!=1):
+        for key,value in detail_coef["level_"+str(k)].items():
+            detail_coef["level_"+str(k)][key] = np.where(np.abs(detail_coef["level_"+str(k)][key])<threshold_val,0,detail_coef["level_"+str(k)][key])
+        k = k-1
+    haar_forward = np.where(np.abs(haar_forward)<threshold_val,0,haar_forward)
+    return detail_coef,haar_forward.astype(np.float32)
+    
 
 
 def inverseHaar2D(a,detail_coef,level=None,threshold=None):
@@ -172,6 +188,54 @@ def yuv2rgb(yuv):
     return np.clip(np.dot(yuv,rgb_from_yuv),0,1)
 
 
+def uncompress(file):
+    with open(file,"r") as f:
+        stream = f.read()
+    stream = stream.split(" ")
+    m = int(stream[0])
+    n = int(stream[1])
+    img = np.zeros((m*n,))
+    i = 2
+    k = 0
+    skipped_zeros = 0
+    while(k<m*n):
+        if(stream[i]==";"):
+            break
+    
+        img[k] =float(''.join(filter(str.isdigit, stream[i])))
+
+        if(i+3<len(stream)):
+            skipped_zeros = int(''.join(filter(str.isdigit, stream[i+3])))
+        
+        if(skipped_zeros!=0):
+            k=k+skipped_zeros+1
+        else:
+            k=k+1
+        i=i+2
+    img = img.reshape((m,n))
+    return img
+
+def haarmatrix2detailCoef(a,haar_transform):
+    m,n = haar_transform.shape
+    M = m
+    N = n
+    x,y = a.shape
+    detail_coef = dict()
+    level=1
+    while(m!=x):
+        curr_dict = {}
+        curr_dict["LH"] = haar_transform[:int(m//2),int(n//2):n]
+        curr_dict["HL"] = haar_transform[int(m//2):m,:int(n//2)]
+        curr_dict["HH"] = haar_transform[int(m//2):m,int(n//2):n]
+        detail_coef["level_"+str(level)] = curr_dict
+        level =level+1
+        m=int(m//2)
+        n = int(n//2)
+    return detail_coef
+
+
+
+
 if __name__ == "__main__":
     img_file = sys.argv[1]
     orig_img  = plt.imread(img_file)
@@ -183,21 +247,29 @@ if __name__ == "__main__":
     # orig_noised_img,_ = gaussian_noise(orig_img)
 
     #forward wavelet transform
-    haar_result,a,detail_coef = haar_transform(orig_img,threshold=0.7)
+    haar_result,a,detail_coef = haar_transform(orig_img)
     #run length encoding
-    bitstream = run_length_encoding(haar_result.flatten())
+    print("thresholding...")
+    detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,50) 
+    print("run length encoding...")
+    bitstream = run_length_encoding(haar_result_after_thresholding)
 
     #writing encoded stream to file
     with open("encoded_file.txt","w") as f:
         f.write(bitstream)
 
-    # #inverse wavelet transform (threshold to remove noise)
+    rturn_img = uncompress("encoded_file.txt")
+    print(rturn_img.shape)
+    detail_coef = haarmatrix2detailCoef(a,rturn_img)
     inv_img = inverseHaar2D(a,detail_coef)
+    inv_img_orig = inverseHaar2D(a,detail_coef_after_thresholding)
     YUV[:,:,0] = inv_img
     back_rgb = yuv2rgb(YUV)
-    plt.imsave(img_file[:-4]+"_inverse_haar.png",back_rgb)
-    plt.imshow(back_rgb)
-    plt.show()
+    YUV[:,:,0] = inv_img_orig
+    back_rgb_orig = yuv2rgb(YUV)
+    plt.imsave(img_file[:-4]+"_inverse_haar_uncompressed.png",back_rgb)
+    plt.imsave(img_file[:-4]+"_inverse_haar_orig.png",back_rgb_orig)
+    cv2.imshow("uncompressed",rturn_img)
     cv2.imshow("haar",haar_result)
-    cv2.waitKey(1)
+    cv2.waitKey(0)
     
