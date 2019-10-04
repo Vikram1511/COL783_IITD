@@ -183,21 +183,21 @@ if __name__ == "__main__":
     # orig_noised_img,_ = gaussian_noise(orig_img)
 
     #forward wavelet transform
-    haar_result,a,detail_coef = haar_transform(orig_img)
-    cv2.imshow("haar",haar_result)
-    cv2.waitKey(0)
+    haar_result,a,detail_coef = haar_transform(orig_img,threshold=0.7)
+    #run length encoding
+    bitstream = run_length_encoding(haar_result.flatten())
 
-    # #run length encoding
-    # bitstream = run_length_encoding(haar_result.flatten())
-
-    # #writing encoded stream to file
-    # with open("encoded_file.txt","w") as f:
-    #     f.write(bitstream)
+    #writing encoded stream to file
+    with open("encoded_file.txt","w") as f:
+        f.write(bitstream)
 
     # #inverse wavelet transform (threshold to remove noise)
-    # inv_img = inverseHaar2D(a,detail_coef)
-    # YUV[:,:,0] = inv_img
-    # back_rgb = yuv2rgb(YUV)
-    # plt.imsave(img_file[:-4]+"_inverse_haar.png",back_rgb)
-    # plt.imshow(back_rgb)
-    # plt.show()
+    inv_img = inverseHaar2D(a,detail_coef)
+    YUV[:,:,0] = inv_img
+    back_rgb = yuv2rgb(YUV)
+    plt.imsave(img_file[:-4]+"_inverse_haar.png",back_rgb)
+    plt.imshow(back_rgb)
+    plt.show()
+    cv2.imshow("haar",haar_result)
+    cv2.waitKey(1)
+    
