@@ -5,10 +5,12 @@ from pywt import dwt2, idwt2
 import sys
 
 gray_conversion = lambda rgb : np.dot(rgb[...,:3],[0.299 , 0.587, 0.114])
-img_file = sys.argv[1]
-orig_img  = plt.imread(img_file)
-if(len(orig_img.shape)>=3):
-        orig_img = gray_conversion(orig_img)
+
+yuv_from_rgb = np.array([[ 0.299     ,  0.587     ,  0.114      ],
+                         [-0.14714119, -0.28886916,  0.43601035 ],
+                         [ 0.61497538, -0.51496512, -0.10001026 ]])
+
+rgb_from_yuv = np.linalg.inv(yuv_from_rgb)
 
 def psnr(I1,I2):
     if(len(I1.shape)==2 and len(I2.shape)==2):
@@ -19,6 +21,19 @@ def psnr(I1,I2):
             R=1
         psnr_val =10*np.log10(R**2/MSE)
     return psnr_val
+
+
+def run_length_encoding(image):
+    bitstream = ""
+    skipped_zeros = 0
+    for i in range(image.shape[0]):
+        if(image[i]!=0):
+            bitstream = bitstream + str(image[i]) + " "+ str(skipped_zeros)+ " "
+            skipped_zeros=0
+        else:
+            skipped_zeros=skipped_zeros+1
+    return bitstream
+
 
 def gaussian_noise(img,var=0.001,mean=0):
     image = img.copy()
@@ -76,7 +91,7 @@ def haar2D(image):
     return result_img,LL,coefficients
 
 
-def haar_transform(image,levels=None): 
+def haar_transform(image,levels=None,threshold=None): 
     img = image.copy()
     m,n = img.shape
     detail_coef = dict()
@@ -96,6 +111,9 @@ def haar_transform(image,levels=None):
                 m = m//2
                 n = n//2
                 level = level+1
+                if(threshold is not None):
+                    for key,value in _coef.items():
+                        _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
                 detail_coef["level_"+str(level)] = _coef
         else:
             while(m!=1):
@@ -105,13 +123,19 @@ def haar_transform(image,levels=None):
                 m = m//2
                 n = n//2
                 level = level+1
+                if(threshold is not None):
+                    for key,value in _coef.items():
+                        _coef[key] = np.where(np.abs(_coef[key])<threshold,0,_coef[key])
                 detail_coef["level_"+str(level)] = _coef
-                
+
+    haar_result = haar_result.astype(np.float32)
+    if(threshold is not None):
+        haar_result = np.where(np.abs(haar_result)<threshold,0,haar_result)
     return haar_result,LL,detail_coef
+
 
 def inverseHaar2D(a,detail_coef,level=None,threshold=None):
     total_levels = len(detail_coef)
-    print(total_levels)
     k = total_levels
     for i in range(total_levels):
         detail_coef_level = detail_coef["level_"+str(k)]
@@ -144,27 +168,36 @@ def inverseHaar2D(a,detail_coef,level=None,threshold=None):
 
     return new_approx
 
-
-#add gaussian noise
-orig_noised_img,_ = gaussian_noise(orig_img)
-
-#forward wavelet transform
-haar_result,a,detail_coef = haar_transform(orig_noised_img)
-
-#inverse wavelet transform (threshold to remove noise)
-inv_img = inverseHaar2D(a,detail_coef,threshold=0.08)
+def yuv2rgb(yuv):
+    return np.clip(np.dot(yuv,rgb_from_yuv),0,1)
 
 
-cv2.imshow("inv_img",inv_img)
-plt.imsave(img_file[:-4]+"_inverse_haar.png",inv_img,cmap='gray')
-cv2.imshow("haar",haar_result)
-cv2.imshow("noised",orig_noised_img)
-plt.imsave(img_file[:-4]+"_noised.png",orig_noised_img,cmap='gray')
-cv2.imshow("original",orig_img)
-print(psnr(orig_img,inv_img))
-print(psnr(orig_img,orig_noised_img))
-cv2.waitKey(0)
-# print(a)
-# print(np.sum(np.power(haar_result)))
-# cv2.imshow("haar",haar_result)
-# cv2.waitKey(0)
+if __name__ == "__main__":
+    img_file = sys.argv[1]
+    orig_img  = plt.imread(img_file)
+    if(len(orig_img.shape)>=3):
+        orig_img = orig_img[:,:,:3]
+        YUV = np.dot(orig_img,yuv_from_rgb)
+        orig_img = YUV[:,:,0]
+
+    # orig_noised_img,_ = gaussian_noise(orig_img)
+
+    #forward wavelet transform
+    haar_result,a,detail_coef = haar_transform(orig_img)
+    cv2.imshow("haar",haar_result)
+    cv2.waitKey(0)
+
+    # #run length encoding
+    # bitstream = run_length_encoding(haar_result.flatten())
+
+    # #writing encoded stream to file
+    # with open("encoded_file.txt","w") as f:
+    #     f.write(bitstream)
+
+    # #inverse wavelet transform (threshold to remove noise)
+    # inv_img = inverseHaar2D(a,detail_coef)
+    # YUV[:,:,0] = inv_img
+    # back_rgb = yuv2rgb(YUV)
+    # plt.imsave(img_file[:-4]+"_inverse_haar.png",back_rgb)
+    # plt.imshow(back_rgb)
+    # plt.show()
