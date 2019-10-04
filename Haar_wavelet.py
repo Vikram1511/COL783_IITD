@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 
 from pywt import dwt2, idwt2
-
+import sys
 
 gray_conversion = lambda rgb : np.dot(rgb[...,:3],[0.299 , 0.587, 0.114])
-orig_img  = plt.imread("test.png")
+img_file = sys.argv[1]
+orig_img  = plt.imread(img_file)
 if(len(orig_img.shape)>=3):
         orig_img = gray_conversion(orig_img)
 
@@ -155,8 +156,10 @@ inv_img = inverseHaar2D(a,detail_coef,threshold=0.08)
 
 
 cv2.imshow("inv_img",inv_img)
+plt.imsave(img_file[:-4]+"_inverse_haar.png",inv_img,cmap='gray')
 cv2.imshow("haar",haar_result)
 cv2.imshow("noised",orig_noised_img)
+plt.imsave(img_file[:-4]+"_noised.png",orig_noised_img,cmap='gray')
 cv2.imshow("original",orig_img)
 print(psnr(orig_img,inv_img))
 print(psnr(orig_img,orig_noised_img))
