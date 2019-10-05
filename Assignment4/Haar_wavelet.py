@@ -202,7 +202,11 @@ def uncompress(file):
         if(stream[i]==";"):
             break
     
-        img[k] =float(''.join(filter(str.isdigit, stream[i])))
+        try:
+            
+            img[k] =float(stream[i])
+        except:
+            pass
 
         if(i+3<len(stream)):
             skipped_zeros = int(''.join(filter(str.isdigit, stream[i+3])))
@@ -269,6 +273,7 @@ if __name__ == "__main__":
     back_rgb_orig = yuv2rgb(YUV)
     plt.imsave(img_file[:-4]+"_inverse_haar_uncompressed.png",back_rgb)
     plt.imsave(img_file[:-4]+"_inverse_haar_orig.png",back_rgb_orig)
+    cv2.imshow("uncompressed_result",back_rgb)
     cv2.imshow("uncompressed",rturn_img)
     cv2.imshow("haar",haar_result)
     cv2.waitKey(0)
