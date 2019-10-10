@@ -78,6 +78,11 @@ def print_gaussian(gaussian_pyramid):
 	for i in range(len(gaussian_pyramid)):
 		cv2.imshow(str(i), gaussian_pyramid[i])
 		cv2.waitKey(0)
+		
+def print_laplacian_pyramid(laplacian_pyramid):
+	for i in range(len(laplacian_pyramid):
+		cv2.imshow(str(i), laplacian_pyramid[i])
+		cv2.waitKey(0)
 
 def laplacian_pyramid(image,levels):
 	assert np.power(2,levels)<=image.shape[0] and np.power(2,levels)<=image.shape[1]
@@ -101,7 +106,16 @@ def reconstructed(lp):
 		expanded_image = cv2.pyrUp(corrected_image)
 	return corrected_image
 
-def blending(image1_l, image2_l, mask_g):
+def blending_with_overlapping_regions(lp1, lp2):
+	LS = []
+	for la,lb in zip(lp1, lp2):
+		rows, cols, dpt = la.shape
+		ls = np.hstack((la[:,0:int(cols/2),:], lb[:, int(cols/2):,:]))
+		LS.append(ls)
+	image = reconstructed(LS)
+	return image
+
+def blending_with_Arbitrary_regions(image1_l, image2_l, mask_g):
 	LS = []
 	for la,lb,gp in zip(image1_l, image2_l, mask_g):
 		rows, cols, dpt = la.shape
@@ -111,36 +125,36 @@ def blending(image1_l, image2_l, mask_g):
 	return image
 
 
-file1 = sys.argv[1]
-file2 = sys.argv[2]
-file3 = sys.argv[3]
+# file1 = sys.argv[1]
+# file2 = sys.argv[2]
+# file3 = sys.argv[3]
 
-image1 = cv2.imread(file1)
-image2 = cv2.imread(file2)
-image3 = cv2.imread(file3)
+# image1 = cv2.imread(file1)
+# image2 = cv2.imread(file2)
+# image3 = cv2.imread(file3)
 
-cv2.imshow("Original1", image1)
-cv2.imshow("Original2", image2)
-cv2.waitKey(0)
+# cv2.imshow("Original1", image1)
+# cv2.imshow("Original2", image2)
+# cv2.waitKey(0)
 
-a1,b1 = laplacian_pyramid(image1, 5)
-a2,b2 = laplacian_pyramid(image2, 5)
-for i in range(5):
-	cv2.imshow(str(i), a1[i])
-	cv2.imshow(str(i), a2[i])
-	cv2.waitKey(0)
+# a1,b1 = laplacian_pyramid(image1, 5)
+# a2,b2 = laplacian_pyramid(image2, 5)
+# for i in range(5):
+# 	cv2.imshow(str(i), a1[i])
+# 	cv2.imshow(str(i), a2[i])
+# 	cv2.waitKey(0)
 
-b3 = gaussian_pyramid(image3, 5)
+# b3 = gaussian_pyramid(image3, 5)
 
-reconstructed1 = reconstructed(a1)
-reconstructed2 = reconstructed(a2)
-cv2.imshow("reconstructed1", reconstructed1)
-cv2.imshow("reconstructed2", reconstructed2)
-cv2.waitKey(0)
+# reconstructed1 = reconstructed(a1)
+# reconstructed2 = reconstructed(a2)
+# cv2.imshow("reconstructed1", reconstructed1)
+# cv2.imshow("reconstructed2", reconstructed2)
+# cv2.waitKey(0)
 
-blended_image = blending(a1, a2, b3)
-cv2.imshow("blended_image", blended_image)
-cv2.waitKey(0)
+# blended_image = blending_with_overlapping_regions(a1, a2)
+# cv2.imshow("blended_image", blended_image)
+# cv2.waitKey(0)
 
 
 
