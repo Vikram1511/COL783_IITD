@@ -4,6 +4,16 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 # https://docs.opencv.org/3.4/dc/da3/tutorial_copyMakeBorder.html
 
+
+yuv_from_rgb = np.array([[ 0.299     ,  0.587     ,  0.114      ],
+                         [-0.14714119, -0.28886916,  0.43601035 ],
+                         [ 0.61497538, -0.51496512, -0.10001026 ]])
+
+rgb_from_yuv = np.linalg.inv(yuv_from_rgb)
+
+def yuv2rgb(yuv):
+    return np.clip(np.dot(yuv,rgb_from_yuv),0,1)
+
 def gaussian_matrix():
 	A = np.zeros([5,5])
 	W = np.array([0.05, 0.25, 0.4, 0.25, 0.05])
@@ -31,10 +41,10 @@ def gaussian_blur(img):
 			for x in range(2, width+2):
 				roi = image[y-2:y+3, x-2:x+3, i]
 				k = (roi*kernel).sum()
-				output[y-2,x-2,i] = k
+				output[y-2,x-2,i] = k/(kernel.sum())
 	output = rescale_intensity(output, in_range=(0, 255))
-	blurred = (output*255).astype("uint8")
-	return blurred
+	output = (output*255).astype('uint8')
+	return output
 
 def pyrDown(img):
 	image = img.copy()
@@ -85,12 +95,12 @@ def laplacian_pyramid(image,levels):
 
 def reconstructed(lp,gp):
 	levels = len(lp)
-	op = lp[-1]	
+	expanded_image = pyrUp(lp[-1])	
 	for i in range(levels-2,-1,-1):
-		print(i)
-		op = pyrUp(op)
-		op = cv2.add(gp[i],lp[i])
-	return op
+		corrected_image = cv2.add(expanded_image,lp[i])
+		expanded_image = pyrUp(corrected_image)
+	return corrected_image
+
 
 file = sys.argv[1]
 image = cv2.imread(file)
@@ -98,7 +108,17 @@ cv2.imshow("Original", image)
 cv2.waitKey(0)
 
 
-a,b = laplacian_pyramid(image,6)
+a,b = laplacian_pyramid(image,3)
+
+for i in range(len(a)):
+	print(b[i].shape)
+	cv2.imshow("image_pyramid"+str(i),b[i])
+cv2.waitKey(0)
+
+for i in range(len(a)):
+	print(a[i].shape)
+	cv2.imshow("image_pyramid"+str(i),a[i])
+cv2.waitKey(0)
 
 c = reconstructed(a,b)
 cv2.imshow("reconstructed", c)

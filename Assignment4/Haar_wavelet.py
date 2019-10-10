@@ -254,7 +254,7 @@ if __name__ == "__main__":
     haar_result,a,detail_coef = haar_transform(orig_img)
     #run length encoding
     print("thresholding...")
-    detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,50) 
+    detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,55) 
     print("run length encoding...")
     bitstream = run_length_encoding(haar_result_after_thresholding)
 
@@ -271,10 +271,8 @@ if __name__ == "__main__":
     back_rgb = yuv2rgb(YUV)
     YUV[:,:,0] = inv_img_orig
     back_rgb_orig = yuv2rgb(YUV)
-    plt.imsave(img_file[:-4]+"_inverse_haar_uncompressed.png",back_rgb)
-    plt.imsave(img_file[:-4]+"_inverse_haar_orig.png",back_rgb_orig)
-    cv2.imshow("uncompressed_result",back_rgb)
-    cv2.imshow("uncompressed",rturn_img)
+    # plt.imsave(img_file[:-4]+"_inverse_haar_uncompressed.png",back_rgb)
+    # plt.imsave(img_file[:-4]+"_inverse_haar_orig.png",back_rgb_orig)
+    plt.imsave("uncompressed_result_baboon.png",back_rgb)
     cv2.imshow("haar",haar_result)
     cv2.waitKey(0)
-    
