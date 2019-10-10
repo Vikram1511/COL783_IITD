@@ -70,7 +70,7 @@ def gaussian_pyramid(image,levels):
 	arr = [layer]
 	for i in range(levels):
 		blurred = gaussian_blur(layer)
-		layer = pyrDown(blurred)
+		layer = cv2.pyrDown(blurred)
 		arr.append(layer)
 	return arr
 	
@@ -86,40 +86,40 @@ def laplacian_pyramid(image,levels):
 
 	lp = []
 	for i in range(1, levels+1):
-		expanded_image = pyrUp(gp[i])
+		expanded_image = cv2.pyrUp(gp[i])
 		j = i-1
 		laplacian = cv2.subtract(gp[j], expanded_image)
 		lp.append(laplacian)
 	lp.append(gp[-1])
 	return lp,gp
 
-def reconstructed(lp,gp):
+def reconstructed(lp):
 	levels = len(lp)
-	expanded_image = pyrUp(lp[-1])	
+	expanded_image = cv2.pyrUp(lp[-1])	
 	for i in range(levels-2,-1,-1):
 		corrected_image = cv2.add(expanded_image,lp[i])
-		expanded_image = pyrUp(corrected_image)
+		expanded_image = cv2.pyrUp(corrected_image)
 	return corrected_image
 
 
-file = sys.argv[1]
-image = cv2.imread(file)
-cv2.imshow("Original", image)
-cv2.waitKey(0)
+# file = sys.argv[1]
+# image = cv2.imread(file)
+# cv2.imshow("Original", image)
+# cv2.waitKey(0)
 
 
-a,b = laplacian_pyramid(image,3)
+# a,b = laplacian_pyramid(image,3)
 
-for i in range(len(a)):
-	print(b[i].shape)
-	cv2.imshow("image_pyramid"+str(i),b[i])
-cv2.waitKey(0)
+# for i in range(len(a)):
+# 	print(b[i].shape)
+# 	cv2.imshow("image_pyramid"+str(i),b[i])
+# cv2.waitKey(0)
 
-for i in range(len(a)):
-	print(a[i].shape)
-	cv2.imshow("image_pyramid"+str(i),a[i])
-cv2.waitKey(0)
+# for i in range(len(a)):
+# 	print(a[i].shape)
+# 	cv2.imshow("image_pyramid"+str(i),a[i])
+# cv2.waitKey(0)
 
-c = reconstructed(a,b)
-cv2.imshow("reconstructed", c)
-cv2.waitKey(0)
+# c = reconstructed(a)
+# cv2.imshow("reconstructed", c)
+# cv2.waitKey(0)
