@@ -92,7 +92,7 @@ def gaussian_pyramid(image,levels):
 	layer = image.copy()
 	arr = [layer]
 	for i in range(levels):
-		layer = cv2.pyrDown(layer)
+		layer = pyrDown(layer)
 		arr.append(layer)
 	return arr
 	
@@ -113,7 +113,7 @@ def laplacian_pyramid(image,levels):
 
 	lp = []
 	for i in range(1, levels+1):
-		expanded_image = cv2.pyrUp(gp[i])
+		expanded_image = pyrUp(gp[i])
 		j = i-1
 		laplacian = cv2.subtract(gp[j],expanded_image)
 		lp.append(laplacian)
@@ -124,7 +124,7 @@ def reconstructed(lp):
 	levels = len(lp)
 	corrected_image = lp[-1]
 	for i in range(levels-2,-1,-1):
-		expanded_image = cv2.pyrUp(corrected_image)
+		expanded_image = pyrUp(corrected_image)
 		# expanded_image = gaussian_blur(expanded_image)
 		corrected_image = cv2.add(expanded_image,lp[i])
 	return corrected_image
@@ -175,7 +175,7 @@ cv2.imshow("reconstructed1", reconstructed1)
 cv2.imshow("reconstructed2", reconstructed2)
 cv2.waitKey(0)
 
-blended_image = blending_with_Arbitrary_regions(a1, a2,b3)
+blended_image = blending_with_overlapping_regions(a1, a2)
 cv2.imshow("blended_image", blended_image)
 cv2.waitKey(0)
 
