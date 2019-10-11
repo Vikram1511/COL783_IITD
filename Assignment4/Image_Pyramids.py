@@ -30,7 +30,7 @@ def padded_image(image):
 
 	return padded_image
 
-def gaussian_blur(img,up=False):
+def gaussian_blur(img,up=False,mask=False):
 	image = img.copy()
 	height, width, ch = image.shape
 	print(image.shape)
@@ -46,7 +46,7 @@ def gaussian_blur(img,up=False):
 					output[y-2,x-2,i] = k/(kernel.sum())
 				else:
 					output[y-2,x-2,i] = 4*(k/(kernel.sum()))
-	# output = rescale_intensity(output, in_range=(output.min(), output.max()),out_range=(0,255))
+	output = rescale_intensity(output, in_range=(output.min(), output.max()),out_range=(0,255))
 	return output
 
 def pyrDown(img):
@@ -87,7 +87,7 @@ def gaussian_pyramid(image,levels):
 	layer = image.copy()
 	arr = [layer]
 	for i in range(levels):
-		layer = cv2.pyrDown(layer)
+		layer = pyrDown(layer)
 		arr.append(layer)
 	return arr
 	
@@ -108,7 +108,7 @@ def laplacian_pyramid(image,levels):
 
 	lp = []
 	for i in range(1, levels+1):
-		expanded_image = cv2.pyrUp(gp[i])
+		expanded_image = pyrUp(gp[i])
 		j = i-1
 		laplacian = cv2.subtract(gp[j],expanded_image)
 		lp.append(laplacian)
@@ -119,7 +119,7 @@ def reconstructed(lp):
 	levels = len(lp)
 	corrected_image = lp[-1]
 	for i in range(levels-2,-1,-1):
-		expanded_image = cv2.pyrUp(corrected_image)
+		expanded_image = pyrUp(corrected_image)
 		# expanded_image = gaussian_blur(expanded_image)
 		corrected_image = cv2.add(expanded_image,lp[i])
 	return corrected_image
@@ -136,8 +136,15 @@ def blending_with_overlapping_regions(lp1, lp2):
 def blending_with_Arbitrary_regions(image1_l, image2_l, mask_g):
 	LS = []
 	for la,lb,gp in zip(image1_l, image2_l, mask_g):
+		gp = rescale_intensity(gp,in_range=(gp.min(),gp.max()),out_range=(0,1))
+		cv2.imshow('gp',gp)
+		cv2.waitKey(0)
 		rows, cols, dpt = la.shape
-		ls = cv2.add(gp*la, (1-gp)*lb)
+		gla =  gp*la
+		glb = (1-gp)*lb
+		ls = cv2.add(gla,glb)
+		cv2.imshow("ls",ls)
+		cv2.waitKey(0)
 		LS.append(ls)
 	image = reconstructed(LS)
 	return image
@@ -155,12 +162,17 @@ cv2.imshow("Original1", image1)
 cv2.imshow("Original2", image2)
 cv2.waitKey(0)
 
-a1,b1 = laplacian_pyramid(image1, 5)
-a2,b2 = laplacian_pyramid(image2, 5)
-print_laplacian_pyramid(a2)
-print_laplacian_pyramid(a1)
+a1,b1 = laplacian_pyramid(image1, 3)
+a2,b2 = laplacian_pyramid(image2, 3)
+# print_laplacian_pyramid(a2)
+# print_laplacian_pyramid(a1)
 
-b3 = gaussian_pyramid(image3, 5)
+# b3 = [image3]
+# for i in range(3):
+# 	l = cv2.pyrDown(image3)
+# 	image3=l
+# 	b3.append(l)
+# b3 = gaussian_pyramid(image3,3)
 
 reconstructed1 = reconstructed(a1)
 reconstructed2 = reconstructed(a2)
@@ -168,7 +180,7 @@ cv2.imshow("reconstructed1", reconstructed1)
 cv2.imshow("reconstructed2", reconstructed2)
 cv2.waitKey(0)
 
-blended_image = blending_with_Arbitrary_regions(a1, a2,b3)
+blended_image = blending_with_overlapping_regions(a1, a2)
 cv2.imshow("blended_image", blended_image)
 cv2.waitKey(0)
 
