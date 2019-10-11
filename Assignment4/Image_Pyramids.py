@@ -100,6 +100,11 @@ def print_gaussian(gaussian_pyramid):
 	for i in range(len(gaussian_pyramid)):
 		cv2.imshow(str(i), gaussian_pyramid[i])
 		cv2.waitKey(0)
+		
+def print_laplacian_pyramid(laplacian_pyramid):
+    for i in range(len(laplacian_pyramid)):
+        cv2.imshow(str(i), laplacian_pyramid[i])
+        cv2.waitKey(0)
 
 def laplacian_pyramid(image,levels):
 	assert np.power(2,levels)<=image.shape[0] and np.power(2,levels)<=image.shape[1]
@@ -124,7 +129,16 @@ def reconstructed(lp):
 		corrected_image = cv2.add(expanded_image,lp[i])
 	return corrected_image
 
-def blending(image1_l, image2_l, mask_g):
+def blending_with_overlapping_regions(lp1, lp2):
+	LS = []
+	for la,lb in zip(lp1, lp2):
+		rows, cols, dpt = la.shape
+		ls = np.hstack((la[:,0:int(cols/2),:], lb[:, int(cols/2):,:]))
+		LS.append(ls)
+	image = reconstructed(LS)
+	return image
+
+def blending_with_Arbitrary_regions(image1_l, image2_l, mask_g):
 	LS = []
 	for la,lb,gp in zip(image1_l, image2_l, mask_g):
 		rows, cols, dpt = la.shape
@@ -161,7 +175,7 @@ cv2.imshow("reconstructed1", reconstructed1)
 cv2.imshow("reconstructed2", reconstructed2)
 cv2.waitKey(0)
 
-blended_image = blending(a1, a2, b3)
+blended_image = blending_with_Arbitrary_regions(a1, a2,b3)
 cv2.imshow("blended_image", blended_image)
 cv2.waitKey(0)
 
