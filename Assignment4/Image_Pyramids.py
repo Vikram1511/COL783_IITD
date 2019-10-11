@@ -11,6 +11,7 @@ yuv_from_rgb = np.array([[ 0.299     ,  0.587     ,  0.114      ],
 
 rgb_from_yuv = np.linalg.inv(yuv_from_rgb)
 
+gaussian_kernel = np.array([[1,4,6,4,1],[4,16,24,16,4],[6,24,36,24,6],[4,16,24,16,4],[1,4,6,4,1]])
 def yuv2rgb(yuv):
     return np.clip(np.dot(yuv,rgb_from_yuv),0,1)
 
@@ -29,48 +30,69 @@ def padded_image(image):
 
 	return padded_image
 
-def gaussian_blur(img):
+def gaussian_blur(img,up=False):
 	image = img.copy()
 	height, width, ch = image.shape
 	print(image.shape)
 	image = padded_image(image)
-	output = np.zeros((height, width, ch), dtype="float32")
-	kernel = gaussian_matrix()
+	output = np.zeros((height, width, ch), dtype=str(image.dtype))
+	kernel = gaussian_kernel
 	for i in range(ch):
 		for y in range(2, height+2):
 			for x in range(2, width+2):
 				roi = image[y-2:y+3, x-2:x+3, i]
 				k = (roi*kernel).sum()
-				output[y-2,x-2,i] = k/(kernel.sum())
-	output = rescale_intensity(output, in_range=(0, 255))
-	output = (output*255).astype('uint8')
+				if(up==False):
+					output[y-2,x-2,i] = k/(kernel.sum())
+				else:
+					output[y-2,x-2,i] = 4*(k/(kernel.sum()))
+	# output = rescale_intensity(output, in_range=(output.min(), output.max()),out_range=(0,255))
 	return output
 
 def pyrDown(img):
 	image = img.copy()
-	scale = 0.5
-	width = int(image.shape[1]*scale)
-	height = int(image.shape[0]*scale)
-	dim = (width, height)
-	resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
-	return resized
+	image =gaussian_blur(image)
+	m,n,c = image.shape
+
+	output = np.zeros((int(m/2), n, c), dtype=str(image.dtype))
+	for j in range(int(m/2)):
+		output[j,:,:] = image[2*j+1,:,:]
+
+	output_new = np.zeros((int(m/2),int(n/2),c),dtype=str(image.dtype))
+	for i in range(int(n/2)):
+		output_new[:,i,:] = output[:,2*i+1,:]
+	# scale = 0.5
+	# width = int(image.shape[1]*scale)
+	# height = int(image.shape[0]*scale)
+	# dim = (width, height)
+	# resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+	return output_new
 
 def pyrUp(img):
 	image = img.copy()
+	m = image.shape[0]
+	n = image.shape[1]
 	scale = 2
 	width = int(image.shape[1]*scale)
 	height = int(image.shape[0]*scale)
-	dim = (width, height)
-	resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
-	return resized
+	output = np.zeros((height,n,image.shape[2]),dtype=str(image.dtype))
+	for i in range(int(height/2)):
+		output[2*i+1,:,:] = image[i,:,:]
+	
+	output_new = np.zeros((height,width,image.shape[2]),dtype=str(image.dtype))
+	for i in range(int(width/2)):
+		output_new[:,2*i+1,:]= output[:,i,:]
+	result = gaussian_blur(output_new,up=True)
+	# dim = (width, height)
+	# resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+	return result
 
 def gaussian_pyramid(image,levels):
 	assert np.power(2,levels)<=image.shape[0] and np.power(2,levels)<=image.shape[1]
 	layer = image.copy()
 	arr = [layer]
 	for i in range(levels):
-		blurred = gaussian_blur(layer)
-		layer = cv2.pyrDown(blurred)
+		layer = cv2.pyrDown(layer)
 		arr.append(layer)
 	return arr
 	
@@ -88,17 +110,18 @@ def laplacian_pyramid(image,levels):
 	for i in range(1, levels+1):
 		expanded_image = cv2.pyrUp(gp[i])
 		j = i-1
-		laplacian = cv2.subtract(gp[j], expanded_image)
+		laplacian = cv2.subtract(gp[j],expanded_image)
 		lp.append(laplacian)
 	lp.append(gp[-1])
 	return lp,gp
 
 def reconstructed(lp):
 	levels = len(lp)
-	expanded_image = cv2.pyrUp(lp[-1])	
+	corrected_image = lp[-1]
 	for i in range(levels-2,-1,-1):
-		corrected_image = cv2.add(expanded_image,lp[i])
 		expanded_image = cv2.pyrUp(corrected_image)
+		# expanded_image = gaussian_blur(expanded_image)
+		corrected_image = cv2.add(expanded_image,lp[i])
 	return corrected_image
 
 def blending(image1_l, image2_l, mask_g):
@@ -127,7 +150,7 @@ a1,b1 = laplacian_pyramid(image1, 5)
 a2,b2 = laplacian_pyramid(image2, 5)
 for i in range(5):
 	cv2.imshow(str(i), a1[i])
-	cv2.imshow(str(i), a2[i])
+	cv2.imshow(str(i)+"h", a2[i])
 	cv2.waitKey(0)
 
 b3 = gaussian_pyramid(image3, 5)
