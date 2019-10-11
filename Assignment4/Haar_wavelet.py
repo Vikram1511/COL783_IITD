@@ -3,12 +3,17 @@ import matplotlib.pyplot as plt
 import cv2 
 from pywt import dwt2, idwt2
 import sys
+from skimage.exposure import rescale_intensity
+
 
 gray_conversion = lambda rgb : np.dot(rgb[...,:3],[0.299 , 0.587, 0.114])
 
+
+#matrix for conversion of rgb  to yuv
 yuv_from_rgb = np.array([[ 0.299     ,  0.587     ,  0.114      ],
                          [-0.14714119, -0.28886916,  0.43601035 ],
                          [ 0.61497538, -0.51496512, -0.10001026 ]])
+
 
 rgb_from_yuv = np.linalg.inv(yuv_from_rgb)
 
@@ -23,6 +28,7 @@ def psnr(I1,I2):
     return psnr_val
 
 
+#run length encoding which writes the image into an encoded file
 def run_length_encoding(image):
     m,n = image.shape
     image= image.flatten()
@@ -38,6 +44,8 @@ def run_length_encoding(image):
     return bitstream
 
 
+
+#add gausian noise
 def gaussian_noise(img,var=0.001,mean=0):
     image = img.copy()
     if len(image.shape)==2:
@@ -53,6 +61,16 @@ def gaussian_noise(img,var=0.001,mean=0):
             noise_image[:,:,i]=image[:,:,i]+gaussian_matrix
     return noise_image,gaussian_matrix
 
+
+
+'''
+ returns discrete haar transformation of an input image for one level in following way
+
+        | LL | LH |
+        |____|____|
+        | HL | HH |
+        |____|____|
+'''
 def haar2D(image):
     img = image.copy()
     assert len(img.shape)==2
@@ -94,6 +112,14 @@ def haar2D(image):
     return result_img,LL,coefficients
 
 
+
+'''
+perform haar transform of an image for given number of levels
+@returns 
+    haar_result - a 2d matrix of details and approximation in top left corner
+    LL          -  aprromixatio coefficient after haar transformation for given number of levels
+    details coefficients
+'''
 def haar_transform(image,levels=None,K=None): 
     img = image.copy()
     m,n = img.shape
@@ -132,6 +158,19 @@ def haar_transform(image,levels=None,K=None):
                 detail_coef["level_"+str(level)] = _coef
     return haar_result,LL,detail_coef
 
+
+'''
+ @inputs
+    a - approximation coefficient matrix
+    detail coefficient after haar transformation
+    haar_forward - a 2d matrix containing approximation and details coefficients
+    K- input for thresholding(retain top K% details coefficients and others are converted to zero)
+
+    softT --> for soft thresholding
+    HardT --> for hard thresholding
+
+@returns - details coefficients after thresholding and haar 2d matrix after threshodling
+'''
 def thresholdingWaveletCoef(a,detail_coef,haar_forward,K):
     total_levels = len(detail_coef)
     k = total_levels
@@ -143,14 +182,18 @@ def thresholdingWaveletCoef(a,detail_coef,haar_forward,K):
     print(threshold_val)
     while(k!=1):
         for key,value in detail_coef["level_"+str(k)].items():
-            detail_coef["level_"+str(k)][key] = np.where(np.abs(detail_coef["level_"+str(k)][key])<threshold_val,0,detail_coef["level_"+str(k)][key])
+             detail_coef["level_"+str(k)][key] = np.where(np.abs(detail_coef["level_"+str(k)][key])<threshold_val,0,detail_coef["level_"+str(k)][key])
         k = k-1
     haar_forward = np.where(np.abs(haar_forward)<threshold_val,0,haar_forward)
     return detail_coef,haar_forward.astype(np.float32)
     
 
 
-def inverseHaar2D(a,detail_coef,level=None,threshold=None):
+
+'''
+perform inverse haar 2D 
+'''
+def inverseHaar2D(a,detail_coef,level=None,threshold=None,softT=False,HardT = False):
     total_levels = len(detail_coef)
     k = total_levels
     for i in range(total_levels):
@@ -161,9 +204,23 @@ def inverseHaar2D(a,detail_coef,level=None,threshold=None):
         HL = detail_coef_level['HL']
         HH = detail_coef_level['HH']
         if(threshold is not None):
-            LH = np.where(np.abs(LH)>threshold,LH,0)
-            HL = np.where(np.abs(HL)>threshold,HL,0)
-            HH = np.where(np.abs(HH)>threshold,HH,0)
+            if(HardT==True):
+                LH = np.where(np.abs(LH)>threshold,LH,0)
+                HL = np.where(np.abs(HL)>threshold,HL,0)
+                HH = np.where(np.abs(HH)>threshold,HH,0)
+            if(softT==True):
+                LH = np.where(LH>threshold,LH-threshold,LH)
+                LH = np.where(np.abs(LH)<threshold,0,LH)
+                LH = np.where(LH<-threshold,LH+threshold,LH)
+
+                HL = np.where(HL>threshold,HL-threshold,HL)
+                HL = np.where(np.abs(HL)<threshold,0,HL)
+                HL = np.where(HL<-threshold,HL+threshold,HL)
+            
+                HH = np.where(HH>threshold,HH-threshold,HH)
+                HH = np.where(np.abs(HH)<threshold,0,HH)
+                HH = np.where(HH<-threshold,HH+threshold,HH)
+            
         L = np.hstack((LL,LH))
         H = np.hstack((HL,HH))
         haar_t = np.vstack((L,H))
@@ -188,6 +245,10 @@ def yuv2rgb(yuv):
     return np.clip(np.dot(yuv,rgb_from_yuv),0,1)
 
 
+
+'''
+uncompress encoded file(run length encoded file)
+'''
 def uncompress(file):
     with open(file,"r") as f:
         stream = f.read()
@@ -219,6 +280,11 @@ def uncompress(file):
     img = img.reshape((m,n))
     return img
 
+
+'''
+@input - detail coefficients and haar_transform 2D matrix
+ returns a dictionary of detail coefficients where keys are level number and value are detail coefficient matrix
+'''
 def haarmatrix2detailCoef(a,haar_transform):
     m,n = haar_transform.shape
     M = m
@@ -241,38 +307,75 @@ def haarmatrix2detailCoef(a,haar_transform):
 
 
 if __name__ == "__main__":
+
+    #read input and converts it into YUV and take only Y-CHANNEL for further processing
     img_file = sys.argv[1]
     orig_img  = plt.imread(img_file)
+
+    img = orig_img.copy()
     if(len(orig_img.shape)>=3):
         orig_img = orig_img[:,:,:3]
         YUV = np.dot(orig_img,yuv_from_rgb)
         orig_img = YUV[:,:,0]
 
-    # orig_noised_img,_ = gaussian_noise(orig_img)
+    cv2.imshow("original Y",orig_img)
+    cv2.waitKey(0)
+
+    #add gaussian noise
+    orig_noised_img,_ = gaussian_noise(orig_img,var=0.01)
+    YUV[:,:,0]=orig_noised_img
+    rgb_noised = yuv2rgb(YUV)
+    rgb_noised = rescale_intensity(rgb_noised,in_range =(rgb_noised.min(),rgb_noised.max()),out_range=(0,255)).astype('uint8')
+    rgb_noised_BGR = cv2.cvtColor(rgb_noised, cv2.COLOR_RGB2BGR)
+    cv2.imshow("original noised",rgb_noised_BGR)
+    cv2.waitKey(0)
+
 
     #forward wavelet transform
-    haar_result,a,detail_coef = haar_transform(orig_img)
+    haar_result,a,detail_coef = haar_transform(orig_noised_img)
+
+    cv2.imshow("haar_results for noised image",haar_result)
+    cv2.waitKey(0)
+
     #run length encoding
     print("thresholding...")
-    detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,55) 
+
+    '''
+    #perform thresholding for details coefficients as given K-value 
+    # and return details coefficients in dictionary format for each level and haar_2d matrix
+    '''
+    # detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,55) 
+
     print("run length encoding...")
-    bitstream = run_length_encoding(haar_result_after_thresholding)
+    # bitstream = run_length_encoding(haar_result_after_thresholding)
 
     #writing encoded stream to file
-    with open("encoded_file.txt","w") as f:
-        f.write(bitstream)
+    # with open("encoded_file.txt","w") as f:
+    #     f.write(bitstream)
 
-    rturn_img = uncompress("encoded_file.txt")
-    print(rturn_img.shape)
-    detail_coef = haarmatrix2detailCoef(a,rturn_img)
-    inv_img = inverseHaar2D(a,detail_coef)
-    inv_img_orig = inverseHaar2D(a,detail_coef_after_thresholding)
+    #decompress image from encoded file as Haar_2D matrix
+    # rturn_img = uncompress("encoded_file.txt")
+
+    #get details coefficients from decompress haar_2d matrix and store it into dictionary
+    # detail_coef = haarmatrix2detailCoef(a,rturn_img)
+
+    #perform inverse haar transform for decompress coefficients
+    inv_img = inverseHaar2D(a,detail_coef,threshold=0.3,HardT=True)
+    print("psnr_val",psnr(inv_img,orig_img))
+    #perform inverse haar transform for thresholded coefficients
+    # inv_img_orig = inverseHaar2D(a,detail_coef_after_thresholding)
+
+    #decompressed image
     YUV[:,:,0] = inv_img
     back_rgb = yuv2rgb(YUV)
-    YUV[:,:,0] = inv_img_orig
-    back_rgb_orig = yuv2rgb(YUV)
+
+    #to check with decompressed, we also perform inverse haar on stored thresholded coefficients
+    # YUV[:,:,0] = inv_img_orig
+    # back_rgb_orig = yuv2rgb(YUV)
     # plt.imsave(img_file[:-4]+"_inverse_haar_uncompressed.png",back_rgb)
     # plt.imsave(img_file[:-4]+"_inverse_haar_orig.png",back_rgb_orig)
     plt.imsave("uncompressed_result_baboon.png",back_rgb)
-    cv2.imshow("haar",haar_result)
+    back_rgb =  rescale_intensity(back_rgb,in_range =(back_rgb.min(),back_rgb.max()),out_range=(0,255)).astype('uint8')
+    back_bgr = cv2.cvtColor(back_rgb, cv2.COLOR_RGB2BGR)
+    cv2.imshow("haar",back_bgr)
     cv2.waitKey(0)
