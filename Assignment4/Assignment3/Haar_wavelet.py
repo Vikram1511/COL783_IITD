@@ -4,7 +4,7 @@ import cv2
 from pywt import dwt2, idwt2
 import sys
 from skimage.exposure import rescale_intensity
-import pickle as pkl
+
 
 gray_conversion = lambda rgb : np.dot(rgb[...,:3],[0.299 , 0.587, 0.114])
 
@@ -65,6 +65,7 @@ def gaussian_noise(img,var=0.001,mean=0):
 
 '''
  returns discrete haar transformation of an input image for one level in following way
+
         | LL | LH |
         |____|____|
         | HL | HH |
@@ -164,8 +165,10 @@ def haar_transform(image,levels=None,K=None):
     detail coefficient after haar transformation
     haar_forward - a 2d matrix containing approximation and details coefficients
     K- input for thresholding(retain top K% details coefficients and others are converted to zero)
+
     softT --> for soft thresholding
     HardT --> for hard thresholding
+
 @returns - details coefficients after thresholding and haar 2d matrix after threshodling
 '''
 def thresholdingWaveletCoef(a,detail_coef,haar_forward,K):
@@ -247,9 +250,8 @@ def yuv2rgb(yuv):
 uncompress encoded file(run length encoded file)
 '''
 def uncompress(file):
-    with open(file, "rb") as f:
-        stream = pkl.load(f)
-        f.close()
+    with open(file,"r") as f:
+        stream = f.read()
     stream = stream.split(" ")
     m = int(stream[0])
     n = int(stream[1])
@@ -302,8 +304,7 @@ def haarmatrix2detailCoef(a,haar_transform):
     return detail_coef
 
 
-def bitstring_to_bytes(s):
-    return int(s, 2).to_bytes(len(s) // 8, byteorder='big')
+
 
 if __name__ == "__main__":
 
@@ -317,7 +318,7 @@ if __name__ == "__main__":
         YUV = np.dot(orig_img,yuv_from_rgb)
         orig_img = YUV[:,:,0]
 
-    # cv2.imshow("original Y",orig_img)
+    cv2.imshow("original Y",orig_img)
     cv2.waitKey(0)
 
     #add gaussian noise
@@ -326,14 +327,14 @@ if __name__ == "__main__":
     rgb_noised = yuv2rgb(YUV)
     rgb_noised = rescale_intensity(rgb_noised,in_range =(rgb_noised.min(),rgb_noised.max()),out_range=(0,255)).astype('uint8')
     rgb_noised_BGR = cv2.cvtColor(rgb_noised, cv2.COLOR_RGB2BGR)
-    # cv2.imshow("original noised",rgb_noised_BGR)
+    cv2.imshow("original noised",rgb_noised_BGR)
     cv2.waitKey(0)
 
 
     #forward wavelet transform
     haar_result,a,detail_coef = haar_transform(orig_noised_img)
 
-    # cv2.imshow("haar_results for noised image",haar_result)
+    cv2.imshow("haar_results for noised image",haar_result)
     cv2.waitKey(0)
 
     #run length encoding
@@ -343,20 +344,17 @@ if __name__ == "__main__":
     #perform thresholding for details coefficients as given K-value 
     # and return details coefficients in dictionary format for each level and haar_2d matrix
     '''
-    detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,50) 
+    # detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,55) 
 
     print("run length encoding...")
-    bitstream = run_length_encoding(haar_result_after_thresholding)
+    # bitstream = run_length_encoding(haar_result_after_thresholding)
 
     #writing encoded stream to file
-    with open("encoded_file.pkl", "wb") as f:
-        # f.write(bitstring_to_bytes(bitstream))
-        # f.write(bitstr)
-        pkl.dump(bitstream, f)
-        f.close()
+    # with open("encoded_file.txt","w") as f:
+    #     f.write(bitstream)
 
     #decompress image from encoded file as Haar_2D matrix
-    rturn_img = uncompress("encoded_file.pkl")
+    # rturn_img = uncompress("encoded_file.txt")
 
     #get details coefficients from decompress haar_2d matrix and store it into dictionary
     # detail_coef = haarmatrix2detailCoef(a,rturn_img)
@@ -379,5 +377,5 @@ if __name__ == "__main__":
     plt.imsave("uncompressed_result_baboon.png",back_rgb)
     back_rgb =  rescale_intensity(back_rgb,in_range =(back_rgb.min(),back_rgb.max()),out_range=(0,255)).astype('uint8')
     back_bgr = cv2.cvtColor(back_rgb, cv2.COLOR_RGB2BGR)
-    # cv2.imshow("haar",back_bgr)
+    cv2.imshow("haar",back_bgr)
     cv2.waitKey(0)
