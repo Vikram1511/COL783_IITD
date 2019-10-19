@@ -31,7 +31,7 @@ def padded_image(image):
 
 	return padded_image
 
-def gaussian_blur(img,up=False):
+def gaussian_blur(img,up=False,mask=False):
 	image = img.copy()
 	height, width, ch = image.shape
 	print(image.shape)
@@ -138,10 +138,20 @@ def blending_with_Arbitrary_regions(image1_l, image2_l, mask_g):
 	LS = []
 	for la,lb,gp in zip(image1_l, image2_l, mask_g):
 		gp = rescale_intensity(gp,in_range=(gp.min(),gp.max()),out_range=(0,1))
+<<<<<<< HEAD
+=======
+		cv2.imshow('gp',gp)
+		cv2.waitKey(0)
+>>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 		rows, cols, dpt = la.shape
 		gla =  gp*la
 		glb = (1-gp)*lb
 		ls = cv2.add(gla,glb)
+<<<<<<< HEAD
+=======
+		cv2.imshow("ls",ls)
+		cv2.waitKey(0)
+>>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 		LS.append(ls)
 	image = reconstructed(LS)
 	return image
@@ -159,8 +169,13 @@ image3 = cv2.imread(file3)
 # cv2.imshow("Original2", image2)
 # cv2.waitKey(0)
 
+<<<<<<< HEAD
 a1,b1 = laplacian_pyramid(image1, 2)
 a2,b2 = laplacian_pyramid(image2, 2)
+=======
+a1,b1 = laplacian_pyramid(image1, 3)
+a2,b2 = laplacian_pyramid(image2, 3)
+>>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 # print_laplacian_pyramid(a2)
 # print_laplacian_pyramid(a1)
 
@@ -169,7 +184,11 @@ a2,b2 = laplacian_pyramid(image2, 2)
 # 	l = cv2.pyrDown(image3)
 # 	image3=l
 # 	b3.append(l)
+<<<<<<< HEAD
 b3 = gaussian_pyramid(image3,2)
+=======
+# b3 = gaussian_pyramid(image3,3)
+>>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 
 reconstructed1 = reconstructed(a1)
 reconstructed2 = reconstructed(a2)
@@ -177,11 +196,175 @@ cv2.imshow("reconstructed1", reconstructed1)
 cv2.imshow("reconstructed2", reconstructed2)
 cv2.waitKey(0)
 
-blended_image = blending_with_Arbitrary_regions(a1, a2,b3)
+blended_image = blending_with_overlapping_regions(a1, a2)
 cv2.imshow("blended_image", blended_image)
 plt.imsave("blended_image.png",blended_image)
 cv2.waitKey(0)
 
+def find_nearest_above(my_array, target):
+    diff = my_array - target
+    mask = np.ma.less_equal(diff, -1)
+    # We need to mask the negative differences
+    # since we are looking for values above
+    if np.all(mask):
+        c = np.abs(diff).argmin()
+        return c # returns min index of the nearest if target is greater than any value
+    masked_diff = np.ma.masked_array(diff, mask)
+    return masked_diff.argmin()
+
+def hist_match(original, specified):
+ 
+    oldshape = original.shape
+    original = original.ravel()
+    specified = specified.ravel()
+ 
+    # get the set of unique pixel values and their corresponding indices and counts
+    s_values, bin_idx, s_counts = np.unique(original, return_inverse=True,return_counts=True)
+    t_values, t_counts = np.unique(specified, return_counts=True)
+ 
+    # Calculate s_k for original image
+    s_quantiles = np.cumsum(s_counts).astype(np.float64)
+    s_quantiles /= s_quantiles[-1]
+    
+    # Calculate s_k for specified image
+    t_quantiles = np.cumsum(t_counts).astype(np.float64)
+    t_quantiles /= t_quantiles[-1]
+ 
+    # Round the values
+    sour = np.around(s_quantiles*255)
+    temp = np.around(t_quantiles*255)
+    
+    # Map the rounded values
+    b=[]
+    for data in sour[:]:
+        b.append(find_nearest_above(temp,data))
+    b= np.array(b,dtype='uint8')
+ 
+    return b[bin_idx].reshape(oldshape)
+
+file1 = sys.argv[1]
+file2 = sys.argv[2]
+
+
+image1 = cv2.imread(file1)
+image2 = cv2.imread(file2)
+
+print(image1.shape)
+print(image2.shape)
+cv2.imshow("Original1", image1)
+cv2.imshow("Original2", image2)
+cv2.waitKey(0)
+
+cascPath = "haarcascade_frontalface_default.xml"
+faceCascade = cv2.CascadeClassifier(cascPath)
+
+# The image is read and converted to grayscale
+gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+
+# The face or faces in an image are detected
+# This section requires the most adjustments to get accuracy on face being detected.
+copy1 = image1.copy()
+copy2 = image2.copy()
+
+faces1 = faceCascade.detectMultiScale(
+    gray1,
+    scaleFactor=1.1,
+    minNeighbors=5,
+    minSize=(1,1),
+    flags = cv2.CASCADE_SCALE_IMAGE
+)
+
+faces2 = faceCascade.detectMultiScale(
+    gray2,
+    scaleFactor=1.1,
+    minNeighbors=5,
+    minSize=(1,1),
+    flags = cv2.CASCADE_SCALE_IMAGE
+)
+
+print("Detected {0} faces!".format(len(faces1)))
+
+# This draws a green rectangle around the faces detected
+
+# for (x, y, w, h) in faces1:
+#     cv2.rectangle(image1, (x, y), (x+w, y+h), (0, 255, 0), 0)
+
+# for (x, y, w, h) in faces2:
+#     cv2.rectangle(image2, (x, y), (x+w, y+h), (0, 255, 0), 0)
+
+# mask = cv2.subtract(image2, copy2)
+a = hist_match(image1, image2)
+
+# image2 = cv2.subtract(image2, mask)
+
+l1,g1 = laplacian_pyramid(a,5)
+l2,g2 = laplacian_pyramid(image2,5)
+
+a = gaussian_blur(a)
+
+cv2.imshow("A", a)
+cv2.waitKey(0)
+
+cv2.imshow("Mask", mask)
+cv2.waitKey(0)
+# l3=[]
+# for i in range(5):
+# 	l3.append(cv2.add(l1[i],l2[i]))
+
+# print_laplacian_pyramid(l3)
+# reconstructed = reconstructed(l3)
+# reconstructed = cv2.subtract(reconstructed, mask)
+# cv2.imshow("reconstructed", reconstructed)
+
+# cv2.waitKey(0)
+
+
+
+# a = hist_match(image1, image2)
+# cv2.imshow("hist_match", a)
+# cv2.waitKey(0)
+
+
+
+# l2,g2 = laplacian_pyramid(image2, 5)
+
+# cv2.imshow("a", l2[0])
+# cv2.waitKey(0)
+# # a1,b1 = laplacian_pyramid(image1, 5)
+# # a2,b2 = laplacian_pyramid(image2, 5)
+# # a3 = []
+# # for i in range(len(a1)):
+# 	a = hist_match(b1[i], b2[i])
+# 	a3.append(a)
+
+# for i in range(len(a3)):
+# 	a3[i] = cv2.add(a3[i], a2[i])
+
+# for i in range(len(a3)):
+# 	cv2.imshow(str(i), a3[i])
+# 	cv2.waitKey(0)
+
+# reconstructed = reconstructed(a3)
+# cv2.imshow("re", reconstructed)
+# cv2.waitKey(0)
+
+
+# a,b = laplacian_pyramid(image,3)
+
+# for i in range(len(a)):
+# 	print(b[i].shape)
+# 	cv2.imshow("image_pyramid"+str(i),b[i])
+# cv2.waitKey(0)
+
+# for i in range(len(a)):
+# 	print(a[i].shape)
+# 	cv2.imshow("image_pyramid"+str(i),a[i])
+# cv2.waitKey(0)
+
+# c = reconstructed(a)
+# cv2.imshow("reconstructed", c)
+# cv2.waitKey(0)
 
 
 

@@ -344,7 +344,6 @@ if __name__ == "__main__":
     # and return details coefficients in dictionary format for each level and haar_2d matrix
     '''
     detail_coef_after_thresholding,haar_result_after_thresholding = thresholdingWaveletCoef(a,detail_coef,haar_result,50) 
-
     print("run length encoding...")
     bitstream = run_length_encoding(haar_result_after_thresholding)
 
