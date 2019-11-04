@@ -138,20 +138,14 @@ def blending_with_Arbitrary_regions(image1_l, image2_l, mask_g):
 	LS = []
 	for la,lb,gp in zip(image1_l, image2_l, mask_g):
 		gp = rescale_intensity(gp,in_range=(gp.min(),gp.max()),out_range=(0,1))
-<<<<<<< HEAD
-=======
 		cv2.imshow('gp',gp)
 		cv2.waitKey(0)
->>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 		rows, cols, dpt = la.shape
 		gla =  gp*la
 		glb = (1-gp)*lb
 		ls = cv2.add(gla,glb)
-<<<<<<< HEAD
-=======
 		cv2.imshow("ls",ls)
 		cv2.waitKey(0)
->>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 		LS.append(ls)
 	image = reconstructed(LS)
 	return image
@@ -169,13 +163,8 @@ image3 = cv2.imread(file3)
 # cv2.imshow("Original2", image2)
 # cv2.waitKey(0)
 
-<<<<<<< HEAD
-a1,b1 = laplacian_pyramid(image1, 2)
-a2,b2 = laplacian_pyramid(image2, 2)
-=======
 a1,b1 = laplacian_pyramid(image1, 3)
 a2,b2 = laplacian_pyramid(image2, 3)
->>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 # print_laplacian_pyramid(a2)
 # print_laplacian_pyramid(a1)
 
@@ -184,11 +173,7 @@ a2,b2 = laplacian_pyramid(image2, 3)
 # 	l = cv2.pyrDown(image3)
 # 	image3=l
 # 	b3.append(l)
-<<<<<<< HEAD
-b3 = gaussian_pyramid(image3,2)
-=======
 # b3 = gaussian_pyramid(image3,3)
->>>>>>> f731938e94186faf3a63d3e8a2d7b46d2cfb5acc
 
 reconstructed1 = reconstructed(a1)
 reconstructed2 = reconstructed(a2)
